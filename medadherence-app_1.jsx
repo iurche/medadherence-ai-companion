@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   Home, MessageCircle, BookOpen, BarChart2, ChevronLeft,
   Check, Leaf, Sun, Moon, Clock, User, Stethoscope, Activity,
-  Heart, Sparkles, ArrowRight, Calendar, TrendingUp
+  Heart, Sparkles, ArrowRight, Calendar, TrendingUp, Send
 } from "lucide-react";
 
 const COMPANION_SYSTEM = `You are a close friend who happens to have deep knowledge of autoimmune conditions and rheumatology. You talk like a person, not a medical system. You are warm, curious, and proactive — you move conversations forward, offer real perspective, and help people feel capable of managing their condition.
@@ -43,29 +43,30 @@ const geminiModel = genAI.getGenerativeModel({
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────
 const C = {
-  bg:           "#F7F3EE",
-  bgCard:       "#FFFFFF",
-  bgAI:         "#FDF0E0",
-  sage:         "#6B9E7A",
-  sageLight:    "#E5EFE7",
-  sageDark:     "#4A7A5A",
-  terra:        "#C4835A",
-  terraLight:   "#F5E6DB",
-  terraDark:    "#A05A38",
-  text:         "#1A1A18",
-  muted:        "#6B7280",
-  light:        "#9CA3AF",
-  streak:       "#10B981",
-  border:       "#E8E0D5",
-  borderLight:  "#F0EAE2",
+  bg:           "#FAF8F4",   // warm cream page background
+  bgCard:       "#FFFFFF",   // card/panel surfaces
+  bgAI:         "#FDF6EE",   // warm tinted surface
+  sage:         "#5A8B6E",   // sage green — primary
+  sageLight:    "#EEF4F0",   // sage 10% tint
+  sageDark:     "#4A7A5A",   // darker sage
+  terra:        "#C17B4A",   // terracotta accent
+  terraLight:   "#FDF0E8",   // terracotta 10% tint
+  terraDark:    "#A05A38",   // darker terra
+  text:         "#2C2A27",   // near-black warm
+  textBody:     "#4A4742",   // dark warm grey body
+  muted:        "#7A7470",   // muted warm grey
+  light:        "#9CA3AF",   // compat alias
+  streak:       "#5A8B6E",   // sage for streaks
+  border:       "#E8E3DC",   // warm border
+  borderLight:  "#F0EAE2",   // lighter border
+  white:        "#FFFFFF",
   dark:         "#1A2B22",
   darkSurface:  "#233828",
-  white:        "#FFFFFF",
 };
 
 const F = {
   serif: "'Lora', Georgia, serif",
-  sans:  "'DM Sans', system-ui, sans-serif",
+  sans:  "'Raleway', system-ui, sans-serif",
 };
 
 // ─── SCREENS ──────────────────────────────────────────────────────
@@ -150,6 +151,12 @@ const RECOVERY_STEPS = [
 // ─── HELPERS ──────────────────────────────────────────────────────
 const pickRandom = arr => arr[Math.floor(Math.random() * arr.length)];
 
+function adherenceColor(pct) {
+  if (pct >= 80) return C.sage;
+  if (pct >= 51) return "#C4973A";
+  return C.terra;
+}
+
 const phoneWrap = {
   width: "100%",
   maxWidth: 390,
@@ -162,7 +169,7 @@ const phoneWrap = {
 
 const outerWrap = {
   minHeight: "100vh",
-  background: "#EDE8E2",
+  background: "#FAF8F4",
   display: "flex",
   justifyContent: "center",
   alignItems: "flex-start",
@@ -176,21 +183,55 @@ function StreakRing({ streak, goal = 30 }) {
   const pct = Math.min(streak / goal, 1);
   const offset = circ * (1 - pct);
   return (
-    <svg width="176" height="176" viewBox="0 0 176 176" aria-label={`${streak} day streak`}>
-      <circle cx="88" cy="88" r={r} fill="none" stroke={C.borderLight} strokeWidth="10" />
+    <svg
+      width="176" height="176" viewBox="0 0 176 176"
+      aria-label={`${streak} day streak`}
+      style={{ "--ring-circ": circ, "--ring-offset": offset }}
+    >
+      <circle cx="88" cy="88" r={r} fill="none" stroke={C.borderLight} strokeWidth="12" />
       <circle
         cx="88" cy="88" r={r} fill="none"
-        stroke={C.streak} strokeWidth="10"
+        stroke={C.sage} strokeWidth="12"
         strokeLinecap="round"
         strokeDasharray={circ}
         strokeDashoffset={offset}
         transform="rotate(-90 88 88)"
-        style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(0.34, 1.56, 0.64, 1)" }}
+        className="streak-ring-arc"
+        style={{ transition: "stroke-dashoffset 800ms cubic-bezier(0.16, 1, 0.3, 1)" }}
       />
       <text x="88" y="78" textAnchor="middle" fontFamily="Lora, Georgia, serif" fontSize="40" fill={C.text} fontWeight="600">{streak}</text>
-      <text x="88" y="100" textAnchor="middle" fontFamily="DM Sans, system-ui, sans-serif" fontSize="12" fill={C.muted}>day streak</text>
-      <text x="88" y="116" textAnchor="middle" fontFamily="DM Sans, system-ui, sans-serif" fontSize="11" fill={C.light}>of {goal} goal</text>
+      <text x="88" y="100" textAnchor="middle" fontFamily="Raleway, system-ui, sans-serif" fontSize="13" fill={C.muted}>day streak</text>
+      <text x="88" y="118" textAnchor="middle" fontFamily="Raleway, system-ui, sans-serif" fontSize="11" fill={C.muted}>of {goal} goal</text>
     </svg>
+  );
+}
+
+// ─── PROGRESS DOTS ────────────────────────────────────────────────
+function ProgressDots({ step, total = 3 }) {
+  return (
+    <div
+      style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 24 }}
+      aria-label={`Step ${step} of ${total}`}
+    >
+      {Array.from({ length: total }, (_, i) => {
+        const dotStep = i + 1;
+        const isActive = dotStep === step;
+        const isCompleted = dotStep < step;
+        return (
+          <div
+            key={i}
+            style={{
+              width: isActive ? 24 : 8,
+              height: 8,
+              borderRadius: 9999,
+              background: (isActive || isCompleted) ? C.sage : C.border,
+              transition: "all 250ms cubic-bezier(0.16, 1, 0.3, 1)",
+              flexShrink: 0,
+            }}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -202,15 +243,30 @@ function BottomNav({ current, onNavigate }) {
     { id: S.JOURNAL,    icon: BookOpen,      label: "Journal" },
     { id: S.INSIGHTS,   icon: BarChart2,     label: "Insights" },
   ];
+  const activeIdx = tabs.findIndex(t => t.id === current);
   return (
     <nav style={{
       position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
       width: "100%", maxWidth: 390,
       background: C.white,
       borderTop: `1px solid ${C.border}`,
+      boxShadow: "0 -2px 8px rgba(0,0,0,0.06)",
       display: "flex",
       paddingBottom: 16,
+      overflow: "hidden",
     }}>
+      {/* Sliding active indicator */}
+      <div style={{
+        position: "absolute",
+        top: 0,
+        height: 2,
+        background: C.sage,
+        borderRadius: 9999,
+        width: "25%",
+        left: `${activeIdx * 25}%`,
+        transition: "left 250ms cubic-bezier(0.16, 1, 0.3, 1)",
+      }} />
+
       {tabs.map(tab => {
         const active = current === tab.id;
         const Icon = tab.icon;
@@ -218,11 +274,13 @@ function BottomNav({ current, onNavigate }) {
           <button
             key={tab.id}
             onClick={() => onNavigate(tab.id)}
+            className="tab-btn"
             style={{
               flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
               gap: 4, padding: "12px 0 0", background: "none", border: "none",
               cursor: "pointer",
-              color: active ? C.sage : C.light,
+              color: active ? C.sage : C.muted,
+              minHeight: 44,
             }}
           >
             <Icon size={20} strokeWidth={active ? 2 : 1.5} />
@@ -250,19 +308,256 @@ function PillIcon({ color = C.sage, size = 20 }) {
 // ─── GLOBAL STYLES ────────────────────────────────────────────────
 const GlobalStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500;600&display=swap');
-    @keyframes fadeUp { from { opacity:0; transform:translateY(14px) } to { opacity:1; transform:translateY(0) } }
-    @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
-    @keyframes scaleIn { from { opacity:0; transform:scale(0.92) } to { opacity:1; transform:scale(1) } }
-    @keyframes ripple { 0%{transform:scale(0);opacity:0.4} 100%{transform:scale(4);opacity:0} }
-    @keyframes celebPop { 0%{transform:scale(0.8);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Raleway:wght@300;400;500;600;700&display=swap');
+
+    :root {
+      --color-bg:           #FAF8F4;
+      --color-surface:      #FFFFFF;
+      --color-surface-warm: #FDF6EE;
+      --color-primary:      #5A8B6E;
+      --color-primary-light:#EEF4F0;
+      --color-accent:       #C17B4A;
+      --color-accent-light: #FDF0E8;
+      --color-text-primary: #2C2A27;
+      --color-text-body:    #4A4742;
+      --color-text-muted:   #7A7470;
+      --color-border:       #E8E3DC;
+      --color-border-focus: #5A8B6E;
+      --font-heading: 'Lora', Georgia, serif;
+      --font-body:    'Raleway', system-ui, sans-serif;
+      --text-xs:   0.75rem;
+      --text-sm:   0.875rem;
+      --text-base: 1rem;
+      --text-lg:   1.125rem;
+      --text-xl:   1.25rem;
+      --text-2xl:  1.5rem;
+      --text-3xl:  1.875rem;
+      --text-4xl:  2.25rem;
+      --space-1:  0.25rem;
+      --space-2:  0.5rem;
+      --space-3:  0.75rem;
+      --space-4:  1rem;
+      --space-5:  1.25rem;
+      --space-6:  1.5rem;
+      --space-8:  2rem;
+      --space-10: 2.5rem;
+      --space-12: 3rem;
+      --radius-sm:   8px;
+      --radius-md:   12px;
+      --radius-lg:   16px;
+      --radius-xl:   20px;
+      --radius-full: 9999px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.04);
+      --transition-fast: 150ms ease;
+      --transition-base: 200ms ease;
+      --transition-slow: 300ms ease;
     }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes popIn {
+      0%   { opacity: 0; transform: scale(0.5); }
+      70%  { transform: scale(1.15); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+    @keyframes barGrow {
+      from { transform: scaleX(0); }
+      to   { transform: scaleX(1); }
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.92); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    @keyframes celebPop {
+      0%   { transform: scale(0.8); opacity: 0; }
+      60%  { transform: scale(1.08); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     ::-webkit-scrollbar { width: 0; }
     input, textarea, button { font-family: inherit; }
     textarea { resize: none; }
+
+    *:focus { outline: none; }
+    *:focus-visible {
+      outline: 2px solid #5A8B6E;
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    input:focus-visible, textarea:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(90, 139, 110, 0.20), inset 0 0 0 1px #5A8B6E;
+    }
+
+    /* Screen entrance */
+    .screen-enter { animation: fadeUp 280ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    /* Staggered card list */
+    .card-list-item { animation: fadeUp 300ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .card-list-item:nth-child(1) { animation-delay: 0ms; }
+    .card-list-item:nth-child(2) { animation-delay: 60ms; }
+    .card-list-item:nth-child(3) { animation-delay: 120ms; }
+    .card-list-item:nth-child(4) { animation-delay: 180ms; }
+    .card-list-item:nth-child(5) { animation-delay: 240ms; }
+
+    /* Interactive card hover choreography */
+    .card-interactive {
+      transition:
+        transform      200ms cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow     200ms cubic-bezier(0.16, 1, 0.3, 1),
+        border-color   200ms ease,
+        background     200ms ease;
+      cursor: pointer;
+    }
+    .card-interactive:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04) !important;
+      border-color: rgba(90, 139, 110, 0.35) !important;
+    }
+    .card-interactive:active {
+      transform: translateY(0px) scale(0.99);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+      transition-duration: 80ms;
+    }
+
+    /* Primary button press states */
+    .btn-primary {
+      transition:
+        transform    150ms cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow   150ms ease,
+        filter       150ms ease;
+    }
+    .btn-primary:hover {
+      filter: brightness(1.06);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+      transform: translateY(-1px);
+    }
+    .btn-primary:active {
+      transform: scale(0.97) translateY(0);
+      filter: brightness(0.96);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      transition-duration: 80ms;
+    }
+
+    /* Mood chip fill-sweep animation */
+    .mood-chip {
+      position: relative;
+      overflow: hidden;
+      transition: color 200ms ease, border-color 200ms ease;
+      cursor: pointer;
+    }
+    .mood-chip::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: #5A8B6E;
+      border-radius: inherit;
+      transform: scale(0);
+      transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 0;
+    }
+    .mood-chip.selected::before { transform: scale(1); }
+    .mood-chip.selected { color: white !important; border-color: #5A8B6E !important; font-weight: 600; }
+    .mood-chip span { position: relative; z-index: 1; }
+    .mood-chip:hover { border-color: #5A8B6E !important; background: #EEF4F0; }
+    .mood-chip.selected:hover { background: transparent; }
+
+    /* Medication taken checkmark pop */
+    .med-check-icon { animation: popIn 350ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    /* Adherence bar grow on mount */
+    .adherence-bar-fill {
+      transform-origin: left center;
+      animation: barGrow 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: 300ms;
+    }
+
+    /* Condition cards */
+    .condition-card {
+      transition: background 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+      cursor: pointer;
+    }
+    .condition-card:hover {
+      border-color: #5A8B6E !important;
+      background: #EEF4F0 !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+    }
+    .condition-card.selected {
+      background: #EEF4F0 !important;
+      border: 2px solid #5A8B6E !important;
+      font-weight: 600;
+    }
+
+    /* Back link */
+    .back-link { transition: color 200ms ease; }
+    .back-link:hover { color: #4A4742 !important; text-decoration: underline; }
+
+    /* Tab button */
+    .tab-btn { transition: color 200ms ease; }
+
+    /* Clinician / companion prompt card hover */
+    .clinician-card {
+      transition: box-shadow 200ms ease, border-color 200ms ease;
+    }
+    .clinician-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+      border-color: rgba(90, 139, 110, 0.4) !important;
+    }
+    .clinician-card:hover .arrow-icon { color: #5A8B6E !important; }
+
+    /* Desktop phone frame */
+    @media (min-width: 480px) {
+      .phone-frame {
+        box-shadow: 0 8px 24px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.04);
+        border-radius: 24px;
+        overflow: hidden;
+      }
+    }
+
+    /* General interactive transitions */
+    button, [role="button"], input, textarea, select {
+      transition:
+        background-color var(--transition-base, 200ms ease),
+        border-color     var(--transition-base, 200ms ease),
+        box-shadow       var(--transition-base, 200ms ease),
+        color            var(--transition-base, 200ms ease),
+        opacity          var(--transition-base, 200ms ease);
+    }
+
+    /* Skip button hover (warning action) */
+    .skip-btn { transition: border-color 200ms ease, color 200ms ease; }
+    .skip-btn:hover { border-color: #C17B4A !important; color: #C17B4A !important; }
+
+    /* Journal entry hover */
+    .journal-entry {
+      transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms ease, border-color 200ms ease;
+    }
+    .journal-entry:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+      border-color: rgba(90, 139, 110, 0.35) !important;
+    }
   `}</style>
 );
 
@@ -360,28 +655,34 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "60px 32px" }}>
-          <div style={{ animation: "fadeUp 0.7s ease both" }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: "50%",
-              background: C.sageLight,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              marginBottom: 32,
-            }}>
-              <Leaf size={24} color={C.sage} strokeWidth={1.5} />
+        <div className="phone-frame" style={{ ...phoneWrap, display: "flex", flexDirection: "column", justifyContent: "flex-start", alignItems: "center", padding: "0 32px 40px" }}>
+          <div className="screen-enter" style={{ width: "100%", paddingTop: "3rem" }}>
+            {/* Icon */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: 20,
+                background: C.sageLight,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(90,139,110,0.15)",
+              }}>
+                <Leaf size={28} color={C.sage} strokeWidth={1.5} />
+              </div>
             </div>
-            <h1 style={{ fontFamily: F.serif, fontSize: 30, color: C.text, fontWeight: 400, lineHeight: 1.3, marginBottom: 16 }}>
+
+            <h1 style={{ fontFamily: F.serif, fontSize: "2.25rem", color: C.text, fontWeight: 500, lineHeight: 1.2, marginBottom: 16 }}>
               You deserve care that doesn't feel clinical.
             </h1>
-            <p style={{ fontFamily: F.sans, fontSize: 15, color: C.muted, lineHeight: 1.7, marginBottom: 48 }}>
+            <p style={{ fontFamily: F.sans, fontSize: "1rem", color: C.textBody, lineHeight: 1.6, marginBottom: 48 }}>
               A companion for the complex, quiet work of managing your health on your own terms.
             </p>
             <button
+              className="btn-primary"
               onClick={() => setScreen(S.ONBOARD_NAME)}
               style={{
-                width: "100%", padding: "16px", borderRadius: 14,
+                width: "100%", minHeight: 52, padding: "0 24px",
+                borderRadius: 9999,
                 background: C.sage, border: "none",
-                fontFamily: F.sans, fontSize: 15, fontWeight: 600,
+                fontFamily: F.sans, fontSize: "1rem", fontWeight: 600,
                 color: C.white, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
               }}
@@ -399,15 +700,32 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, display: "flex", flexDirection: "column", padding: "80px 32px 40px" }}>
-          <div style={{ flex: 1, animation: "fadeUp 0.6s ease both" }}>
-            <p style={{ fontFamily: F.sans, fontSize: 12, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 20 }}>
+        <div className="phone-frame" style={{ ...phoneWrap, display: "flex", flexDirection: "column", padding: "56px 32px 40px" }}>
+          {/* Back link */}
+          <button
+            className="back-link"
+            onClick={() => setScreen(S.ONBOARD_WELCOME)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: F.sans, fontSize: "0.875rem", color: C.muted,
+              padding: "10px 0", marginBottom: 8,
+              display: "flex", alignItems: "center", gap: 6,
+              minHeight: 44, alignSelf: "flex-start",
+            }}
+          >
+            <ChevronLeft size={16} /> Back
+          </button>
+
+          <div className="screen-enter" style={{ flex: 1 }}>
+            <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>
               1 of 3
             </p>
-            <h2 style={{ fontFamily: F.serif, fontSize: 26, color: C.text, fontWeight: 400, lineHeight: 1.35, marginBottom: 8 }}>
+            <ProgressDots step={1} />
+
+            <h2 style={{ fontFamily: F.serif, fontSize: "1.5rem", color: C.text, fontWeight: 500, lineHeight: 1.35, marginBottom: 8 }}>
               What would you like to be called?
             </h2>
-            <p style={{ fontFamily: F.sans, fontSize: 14, color: C.muted, marginBottom: 36, lineHeight: 1.6 }}>
+            <p style={{ fontFamily: F.sans, fontSize: "1rem", color: C.muted, marginBottom: 32, lineHeight: 1.6 }}>
               Your companion will use this when it speaks with you.
             </p>
             <input
@@ -417,23 +735,26 @@ export default function App() {
               onKeyDown={e => e.key === "Enter" && nameInput.trim() && (setUserName(nameInput.trim()), setScreen(S.ONBOARD_CONDITION))}
               placeholder="Your first name…"
               style={{
-                width: "100%", padding: "14px 18px", borderRadius: 12,
+                width: "100%", padding: "16px 20px", borderRadius: 12,
                 border: `1.5px solid ${nameInput ? C.sage : C.border}`,
                 background: C.bgCard,
-                fontFamily: F.serif, fontSize: 18, color: C.text,
-                outline: "none", transition: "border-color 0.2s ease",
+                fontFamily: F.sans, fontSize: "1rem", color: C.text,
+                outline: "none",
                 marginBottom: 24,
               }}
             />
             <button
+              className="btn-primary"
               onClick={() => { if (nameInput.trim()) { setUserName(nameInput.trim()); setScreen(S.ONBOARD_CONDITION); } }}
               disabled={!nameInput.trim()}
               style={{
-                width: "100%", padding: "15px", borderRadius: 14,
+                width: "100%", minHeight: 52, padding: "0 24px",
+                borderRadius: 9999,
                 background: nameInput.trim() ? C.sage : C.border,
-                border: "none", fontFamily: F.sans, fontSize: 15, fontWeight: 600,
-                color: nameInput.trim() ? C.white : C.light, cursor: nameInput.trim() ? "pointer" : "not-allowed",
-                transition: "all 0.25s ease",
+                border: "none", fontFamily: F.sans, fontSize: "1rem", fontWeight: 600,
+                color: nameInput.trim() ? C.white : C.muted,
+                cursor: nameInput.trim() ? "pointer" : "not-allowed",
+                opacity: nameInput.trim() ? 1 : 0.7,
               }}
             >
               Continue
@@ -449,29 +770,48 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, display: "flex", flexDirection: "column", padding: "80px 32px 40px" }}>
-          <div style={{ animation: "fadeUp 0.6s ease both" }}>
-            <p style={{ fontFamily: F.sans, fontSize: 12, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 20 }}>2 of 3</p>
-            <h2 style={{ fontFamily: F.serif, fontSize: 26, color: C.text, fontWeight: 400, lineHeight: 1.35, marginBottom: 8 }}>
+        <div className="phone-frame" style={{ ...phoneWrap, display: "flex", flexDirection: "column", padding: "56px 32px 40px" }}>
+          {/* Back link */}
+          <button
+            className="back-link"
+            onClick={() => setScreen(S.ONBOARD_NAME)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: F.sans, fontSize: "0.875rem", color: C.muted,
+              padding: "10px 0", marginBottom: 8,
+              display: "flex", alignItems: "center", gap: 6,
+              minHeight: 44, alignSelf: "flex-start",
+            }}
+          >
+            <ChevronLeft size={16} /> Back
+          </button>
+
+          <div className="screen-enter">
+            <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>2 of 3</p>
+            <ProgressDots step={2} />
+
+            <h2 style={{ fontFamily: F.serif, fontSize: "1.5rem", color: C.text, fontWeight: 500, lineHeight: 1.35, marginBottom: 8 }}>
               What are you managing, {userName}?
             </h2>
-            <p style={{ fontFamily: F.sans, fontSize: 14, color: C.muted, marginBottom: 32, lineHeight: 1.6 }}>
+            <p style={{ fontFamily: F.sans, fontSize: "1rem", color: C.muted, marginBottom: 24, lineHeight: 1.6 }}>
               This helps your companion speak to your specific experience.
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 32 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
               {CONDITIONS.map((c, i) => (
                 <button
                   key={c}
                   onClick={() => setCondition(c)}
+                  className={`condition-card${condition === c ? " selected" : ""}`}
                   style={{
-                    padding: "14px 18px", borderRadius: 12, textAlign: "left",
+                    padding: "14px 18px", borderRadius: 16, textAlign: "left",
                     background: condition === c ? C.sageLight : C.bgCard,
-                    border: `1.5px solid ${condition === c ? C.sage : C.border}`,
-                    fontFamily: F.sans, fontSize: 14,
+                    border: condition === c ? `2px solid ${C.sage}` : `1px solid ${C.border}`,
+                    fontFamily: F.sans, fontSize: "1rem",
+                    fontWeight: condition === c ? 600 : 400,
                     color: condition === c ? C.sageDark : C.text,
-                    cursor: "pointer", transition: "all 0.2s ease",
-                    animation: `fadeUp 0.4s ease ${i * 0.06}s both`,
+                    cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "space-between",
+                    boxShadow: condition === c ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
                   }}
                 >
                   {c}
@@ -480,14 +820,17 @@ export default function App() {
               ))}
             </div>
             <button
+              className="btn-primary"
               onClick={() => condition && setScreen(S.ONBOARD_MEDS)}
               disabled={!condition}
               style={{
-                width: "100%", padding: "15px", borderRadius: 14,
+                width: "100%", minHeight: 52, padding: "0 24px",
+                borderRadius: 9999,
                 background: condition ? C.sage : C.border,
-                border: "none", fontFamily: F.sans, fontSize: 15, fontWeight: 600,
-                color: condition ? C.white : C.light, cursor: condition ? "pointer" : "not-allowed",
-                transition: "all 0.25s ease",
+                border: "none", fontFamily: F.sans, fontSize: "1rem", fontWeight: 600,
+                color: condition ? C.white : C.muted,
+                cursor: condition ? "pointer" : "not-allowed",
+                opacity: condition ? 1 : 0.7,
               }}
             >
               Continue
@@ -503,48 +846,69 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, display: "flex", flexDirection: "column", padding: "80px 32px 40px" }}>
-          <div style={{ animation: "fadeUp 0.6s ease both" }}>
-            <p style={{ fontFamily: F.sans, fontSize: 12, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 20 }}>3 of 3</p>
-            <h2 style={{ fontFamily: F.serif, fontSize: 26, color: C.text, fontWeight: 400, lineHeight: 1.35, marginBottom: 8 }}>
+        <div className="phone-frame" style={{ ...phoneWrap, display: "flex", flexDirection: "column", padding: "56px 32px 40px" }}>
+          {/* Back link */}
+          <button
+            className="back-link"
+            onClick={() => setScreen(S.ONBOARD_CONDITION)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: F.sans, fontSize: "0.875rem", color: C.muted,
+              padding: "10px 0", marginBottom: 8,
+              display: "flex", alignItems: "center", gap: 6,
+              minHeight: 44, alignSelf: "flex-start",
+            }}
+          >
+            <ChevronLeft size={16} /> Back
+          </button>
+
+          <div className="screen-enter">
+            <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>3 of 3</p>
+            <ProgressDots step={3} />
+
+            <h2 style={{ fontFamily: F.serif, fontSize: "1.5rem", color: C.text, fontWeight: 500, lineHeight: 1.35, marginBottom: 8 }}>
               Here's what your care plan looks like.
             </h2>
-            <p style={{ fontFamily: F.sans, fontSize: 14, color: C.muted, marginBottom: 32, lineHeight: 1.6 }}>
+            <p style={{ fontFamily: F.sans, fontSize: "1rem", color: C.textBody, marginBottom: 28, lineHeight: 1.6 }}>
               These have been added for you. You can always adjust later.
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 36 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 32 }}>
               {INITIAL_MEDS.map((med, i) => (
                 <div
                   key={med.id}
+                  className="card-list-item"
                   style={{
                     background: C.bgCard, border: `1px solid ${C.border}`,
-                    borderRadius: 14, padding: "16px",
+                    borderRadius: 16, padding: "16px",
                     display: "flex", alignItems: "center", gap: 14,
-                    animation: `fadeUp 0.4s ease ${i * 0.1}s both`,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
                   }}
                 >
                   <div style={{
-                    width: 40, height: 40, borderRadius: 10,
+                    width: 36, height: 36, borderRadius: 10,
                     background: C.sageLight,
                     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                   }}>
                     <PillIcon color={C.sage} />
                   </div>
                   <div>
-                    <p style={{ fontFamily: F.sans, fontWeight: 500, fontSize: 14, color: C.text }}>{med.name}</p>
-                    <p style={{ fontFamily: F.sans, fontSize: 12, color: C.muted }}>{med.dose} · {med.time}</p>
+                    <p style={{ fontFamily: F.sans, fontWeight: 600, fontSize: "1rem", color: C.text }}>{med.name}</p>
+                    <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted }}>{med.dose} · {med.time}</p>
                   </div>
                 </div>
               ))}
             </div>
             <button
+              className="btn-primary"
               onClick={() => setScreen(S.HOME)}
               style={{
-                width: "100%", padding: "15px", borderRadius: 14,
+                width: "100%", minHeight: 52, padding: "0 24px",
+                borderRadius: 9999,
                 background: C.sage, border: "none",
-                fontFamily: F.sans, fontSize: 15, fontWeight: 600,
+                fontFamily: F.sans, fontSize: "1rem", fontWeight: 600,
                 color: C.white, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
               }}
             >
               I'm ready <ArrowRight size={16} />
@@ -561,20 +925,21 @@ export default function App() {
     const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
     const GreetIcon = hour < 12 ? Sun : hour < 18 ? Leaf : Moon;
     const displayName = userName || "Alex";
+    const aColor = adherenceColor(adherencePct);
 
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, paddingBottom: 80 }}>
+        <div className="phone-frame" style={{ ...phoneWrap, paddingBottom: 80 }}>
 
           {/* Header */}
           <div style={{ padding: "52px 24px 20px", background: C.bg }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <p style={{ fontFamily: F.sans, fontSize: 12, color: C.muted, letterSpacing: "0.08em", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
                   <GreetIcon size={13} color={C.sage} /> {greeting}
                 </p>
-                <h1 style={{ fontFamily: F.serif, fontSize: 24, color: C.text, fontWeight: 400, lineHeight: 1.25 }}>
+                <h1 style={{ fontFamily: F.serif, fontSize: "1.875rem", color: C.text, fontWeight: 500, lineHeight: 1.2 }}>
                   How are you feeling, <em>{displayName}?</em>
                 </h1>
               </div>
@@ -586,63 +951,76 @@ export default function App() {
 
           <div style={{ padding: "0 24px 24px" }}>
 
-            {/* Streak Ring */}
-            <div style={{ display: "flex", justifyContent: "center", padding: "16px 0 24px", animation: "fadeUp 0.5s ease 0.1s both" }}>
+            {/* Streak Ring Card */}
+            <div
+              style={{
+                background: C.bgCard, borderRadius: 20, padding: "24px",
+                border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                display: "flex", flexDirection: "column", alignItems: "center",
+                marginBottom: 20, animation: "fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) 0.1s both",
+              }}
+            >
               <StreakRing streak={streak} />
+              <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, marginTop: 8 }}>
+                Keep going — halfway at day 15
+              </p>
             </div>
 
             {/* Medications */}
-            <div style={{ marginBottom: 20, animation: "fadeUp 0.5s ease 0.2s both" }}>
-              <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>
                 Today's medications
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {meds.map((med, i) => (
                   <div
                     key={med.id}
+                    className="card-list-item"
                     style={{
                       background: med.taken ? C.sageLight : C.bgCard,
-                      border: `1px solid ${med.taken ? "#C5DEC9" : C.border}`,
+                      border: `1px solid ${med.taken ? "rgba(90,139,110,0.4)" : C.border}`,
                       borderRadius: 16, padding: "14px 16px",
                       display: "flex", alignItems: "center", gap: 14,
-                      animation: `fadeUp 0.4s ease ${0.25 + i * 0.08}s both`,
-                      boxShadow: "0 1px 4px rgba(26,26,24,0.05)",
+                      boxShadow: "0 1px 3px rgba(26,26,24,0.05)",
+                      transition: "background 300ms ease, border-color 300ms ease",
                     }}
                   >
                     <div style={{
-                      width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                      background: med.taken ? "#C5DEC9" : C.bgCard,
-                      border: `1px solid ${med.taken ? "#A8CEB0" : C.border}`,
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                      background: med.taken ? "rgba(90,139,110,0.2)" : C.sageLight,
+                      border: `1px solid ${med.taken ? "rgba(90,139,110,0.3)" : C.border}`,
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
                       <PillIcon color={med.taken ? C.sageDark : C.sage} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontFamily: F.sans, fontWeight: 500, fontSize: 14, color: med.taken ? C.sageDark : C.text, marginBottom: 2 }}>{med.name}</p>
-                      <p style={{ fontFamily: F.sans, fontSize: 12, color: C.muted }}>{med.dose} · {med.time}</p>
+                      <p style={{ fontFamily: F.sans, fontWeight: 600, fontSize: "1rem", color: med.taken ? C.sageDark : C.text, marginBottom: 2 }}>{med.name}</p>
+                      <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted }}>{med.dose} · {med.time}</p>
                     </div>
                     {med.taken ? (
-                      <div style={{ width: 28, height: 28, borderRadius: "50%", background: C.sage, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div className="med-check-icon" style={{ width: 28, height: 28, borderRadius: "50%", background: C.sage, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <Check size={14} color={C.white} strokeWidth={2.5} />
                       </div>
                     ) : med.skipped ? (
                       <button
                         onClick={() => { setActiveMed(med); setRecoveryStep(0); setScreen(S.RECOVERY); }}
-                        style={{ background: C.terraLight, border: `1px solid ${C.terra}`, borderRadius: 8, padding: "6px 12px", fontFamily: F.sans, fontSize: 11, color: C.terra, cursor: "pointer", fontWeight: 500 }}
+                        style={{ background: C.terraLight, border: `1px solid ${C.terra}`, borderRadius: 9999, padding: "6px 14px", fontFamily: F.sans, fontSize: "0.75rem", color: C.terra, cursor: "pointer", fontWeight: 500 }}
                       >
                         Return
                       </button>
                     ) : (
-                      <div style={{ display: "flex", gap: 8 }}>
+                      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                         <button
+                          className="skip-btn"
                           onClick={() => startRecovery(med)}
-                          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px", fontFamily: F.sans, fontSize: 11, color: C.muted, cursor: "pointer" }}
+                          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 9999, padding: "7px 12px", fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, cursor: "pointer", fontWeight: 500, minHeight: 36 }}
                         >
                           Skip
                         </button>
                         <button
+                          className="btn-primary"
                           onClick={() => { setActiveMed(med); setScreen(S.LOG_CONFIRM); }}
-                          style={{ background: C.sage, border: "none", borderRadius: 8, padding: "6px 14px", fontFamily: F.sans, fontSize: 11, fontWeight: 600, color: C.white, cursor: "pointer", letterSpacing: "0.03em" }}
+                          style={{ background: C.sage, border: "none", borderRadius: 9999, padding: "7px 16px", fontFamily: F.sans, fontSize: "0.75rem", fontWeight: 600, color: C.white, cursor: "pointer", letterSpacing: "0.03em", minHeight: 36 }}
                         >
                           Take
                         </button>
@@ -654,38 +1032,42 @@ export default function App() {
             </div>
 
             {/* Adherence bar */}
-            <div style={{ background: C.bgCard, borderRadius: 16, padding: "18px", border: `1px solid ${C.border}`, animation: "fadeUp 0.5s ease 0.5s both", boxShadow: "0 1px 4px rgba(26,26,24,0.05)" }}>
+            <div style={{ background: C.bgCard, borderRadius: 16, padding: "18px", border: `1px solid ${C.border}`, animation: "fadeUp 0.5s ease 0.5s both", boxShadow: "0 1px 3px rgba(26,26,24,0.05)", marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Today's adherence</p>
-                <span style={{ fontFamily: F.serif, fontSize: 20, color: adherencePct >= 67 ? C.streak : C.terra, fontWeight: 600 }}>{adherencePct}%</span>
+                <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Today's adherence</p>
+                <span style={{ fontFamily: F.serif, fontSize: "1.25rem", color: aColor, fontWeight: 600 }}>{adherencePct}%</span>
               </div>
-              <div style={{ height: 6, borderRadius: 99, background: C.borderLight, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${adherencePct}%`, borderRadius: 99, background: adherencePct >= 67 ? C.streak : C.terra, transition: "width 1s ease" }} />
+              <div style={{ height: 7, borderRadius: 9999, background: C.borderLight, overflow: "hidden" }}>
+                <div
+                  className="adherence-bar-fill"
+                  style={{ height: "100%", width: `${adherencePct}%`, borderRadius: 9999, background: aColor }}
+                />
               </div>
-              <p style={{ fontFamily: F.sans, fontSize: 12, color: C.muted, marginTop: 10 }}>{takenCount} of {totalMeds} medications taken today</p>
+              <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted, marginTop: 10 }}>{takenCount} of {totalMeds} medications taken today</p>
             </div>
 
             {/* Open companion */}
             {pendingMeds.length > 0 && (
               <button
+                className="card-interactive"
                 onClick={() => openCompanion(pendingMeds[0])}
                 style={{
-                  width: "100%", marginTop: 14, padding: "14px 18px",
-                  background: C.bgAI, border: `1px solid #E8D8C0`,
+                  width: "100%", padding: "14px 18px",
+                  background: C.terraLight, border: `1px solid rgba(193,123,74,0.25)`,
                   borderRadius: 16, cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 12,
                   animation: "fadeUp 0.5s ease 0.6s both",
-                  boxShadow: "0 1px 4px rgba(26,26,24,0.06)",
+                  textAlign: "left",
                 }}
               >
-                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#EDD9C0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(193,123,74,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <MessageCircle size={18} color={C.terra} strokeWidth={1.5} />
                 </div>
-                <div style={{ textAlign: "left" }}>
-                  <p style={{ fontFamily: F.serif, fontSize: 14, color: C.text, fontStyle: "italic" }}>
+                <div>
+                  <p style={{ fontFamily: F.serif, fontSize: "1rem", color: C.text, fontStyle: "italic" }}>
                     "Not feeling ready to take your medication?"
                   </p>
-                  <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, marginTop: 2 }}>Talk with your companion first</p>
+                  <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted, marginTop: 2 }}>Talk with your companion first</p>
                 </div>
               </button>
             )}
@@ -702,43 +1084,47 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, display: "flex", flexDirection: "column" }}>
+        <div className="phone-frame" style={{ ...phoneWrap, display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "56px 24px 20px", borderBottom: `1px solid ${C.border}` }}>
-            <button onClick={() => setScreen(S.HOME)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontFamily: F.sans, fontSize: 13, padding: 0, display: "flex", alignItems: "center", gap: 6, marginBottom: 16 }}>
+            <button
+              className="back-link"
+              onClick={() => setScreen(S.HOME)}
+              style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontFamily: F.sans, fontSize: "0.875rem", padding: "10px 0", display: "flex", alignItems: "center", gap: 6, marginBottom: 16, minHeight: 44 }}
+            >
               <ChevronLeft size={16} /> Back
             </button>
-            <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Confirm dose</p>
-            <h2 style={{ fontFamily: F.serif, fontSize: 24, color: C.text, fontWeight: 400 }}>
+            <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Confirm dose</p>
+            <h2 style={{ fontFamily: F.serif, fontSize: "1.5rem", color: C.text, fontWeight: 500 }}>
               Ready to take your<br /><em>{activeMed?.name}?</em>
             </h2>
           </div>
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px" }}>
-            {/* Big pill confirmation target */}
             <div style={{
               width: 140, height: 140, borderRadius: "50%",
               background: C.sageLight,
-              border: `2px solid #C5DEC9`,
+              border: `2px solid rgba(90,139,110,0.35)`,
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               marginBottom: 24, cursor: "pointer",
               animation: "scaleIn 0.4s ease both",
-              boxShadow: "0 4px 24px rgba(107,158,122,0.2)",
+              boxShadow: "0 4px 24px rgba(90,139,110,0.2)",
             }} onClick={confirmTaken}>
               <PillIcon color={C.sage} size={40} />
-              <p style={{ fontFamily: F.sans, fontSize: 11, color: C.sageDark, marginTop: 8, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Tap to confirm</p>
+              <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.sageDark, marginTop: 8, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>Tap to confirm</p>
             </div>
 
             <div style={{ textAlign: "center", marginBottom: 40 }}>
-              <p style={{ fontFamily: F.serif, fontSize: 20, color: C.text, fontWeight: 400, marginBottom: 4 }}>{activeMed?.name}</p>
-              <p style={{ fontFamily: F.sans, fontSize: 13, color: C.muted }}>{activeMed?.dose} · {activeMed?.time}</p>
+              <p style={{ fontFamily: F.serif, fontSize: "1.25rem", color: C.text, fontWeight: 400, marginBottom: 4 }}>{activeMed?.name}</p>
+              <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted }}>{activeMed?.dose} · {activeMed?.time}</p>
             </div>
 
             <button
+              className="btn-primary"
               onClick={confirmTaken}
               style={{
-                width: "100%", padding: "16px", borderRadius: 14,
+                width: "100%", minHeight: 52, padding: "0 24px", borderRadius: 9999,
                 background: C.sage, border: "none",
-                fontFamily: F.sans, fontSize: 15, fontWeight: 600,
+                fontFamily: F.sans, fontSize: "1rem", fontWeight: 600,
                 color: C.white, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
               }}
@@ -756,23 +1142,24 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 32px", background: C.dark }}>
+        <div className="phone-frame" style={{ ...phoneWrap, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 32px", background: C.dark }}>
           <div style={{ textAlign: "center", animation: "celebPop 0.6s ease both" }}>
             <div style={{ marginBottom: 32 }}>
               <StreakRing streak={streak} />
             </div>
-            <h2 style={{ fontFamily: F.serif, fontSize: 28, color: C.white, fontWeight: 400, marginBottom: 16, lineHeight: 1.3 }}>
+            <h2 style={{ fontFamily: F.serif, fontSize: "1.75rem", color: C.white, fontWeight: 400, marginBottom: 16, lineHeight: 1.3 }}>
               Day {streak}. <em>Well done.</em>
             </h2>
-            <p style={{ fontFamily: F.sans, fontSize: 15, color: "rgba(255,255,255,0.65)", lineHeight: 1.7, marginBottom: 48 }}>
+            <p style={{ fontFamily: F.sans, fontSize: "1rem", color: "rgba(255,255,255,0.65)", lineHeight: 1.7, marginBottom: 48 }}>
               You took your {activeMed?.name}. That took something. Be proud of yourself.
             </p>
             <button
+              className="btn-primary"
               onClick={() => setScreen(S.HOME)}
               style={{
-                width: "100%", padding: "16px", borderRadius: 14,
+                width: "100%", minHeight: 52, padding: "0 24px", borderRadius: 9999,
                 background: C.sage, border: "none",
-                fontFamily: F.sans, fontSize: 15, fontWeight: 600,
+                fontFamily: F.sans, fontSize: "1rem", fontWeight: 600,
                 color: C.white, cursor: "pointer",
               }}
             >
@@ -790,30 +1177,68 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, paddingBottom: 80 }}>
+        <div className="phone-frame" style={{ ...phoneWrap, paddingBottom: 80 }}>
 
           {/* Header */}
           <div style={{ padding: "52px 24px 20px", background: C.bg, borderBottom: `1px solid ${C.border}` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#EDD9C0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Sparkles size={18} color={C.terra} strokeWidth={1.5} />
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%",
+                background: C.bgAI,
+                border: `2px solid rgba(193,123,74,0.3)`,
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              }}>
+                <Sparkles size={22} color={C.terra} strokeWidth={1.5} />
               </div>
               <div>
-                <p style={{ fontFamily: F.sans, fontWeight: 500, fontSize: 14, color: C.text }}>Your companion</p>
-                <p style={{ fontFamily: F.sans, fontSize: 11, color: C.streak }}>Here with you</p>
+                <p style={{ fontFamily: F.serif, fontSize: "1.25rem", fontWeight: 500, color: C.text }}>Your companion</p>
+                <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.sage, fontStyle: "italic" }}>Here with you</p>
               </div>
               {activeMed && (
-                <div style={{ marginLeft: "auto", background: C.sageLight, borderRadius: 20, padding: "5px 12px" }}>
-                  <p style={{ fontFamily: F.sans, fontSize: 11, color: C.sageDark }}>{activeMed.name}</p>
+                <div style={{ marginLeft: "auto", background: C.sageLight, borderRadius: 9999, padding: "5px 14px" }}>
+                  <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.sageDark, fontWeight: 500 }}>{activeMed.name}</p>
                 </div>
               )}
             </div>
           </div>
 
+          {/* Static conversation history */}
+          <div style={{ padding: "20px 24px 0" }}>
+            <div style={{ opacity: 0.65 }}>
+              {/* Past companion message */}
+              <div style={{
+                background: C.bgAI, borderRadius: 16, padding: "18px 20px",
+                border: `1px solid #E8D8C0`, marginBottom: 12,
+              }}>
+                <p style={{ fontFamily: F.serif, fontSize: "0.9375rem", lineHeight: 1.75, color: C.textBody, fontStyle: "italic" }}>
+                  "It sounds like yesterday was heavy. Rest is part of the work too."
+                </p>
+                <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, marginTop: 8 }}>Yesterday, 8:42 PM</p>
+              </div>
+              {/* User reply */}
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                <div style={{ background: C.sage, borderRadius: "14px 4px 14px 14px", padding: "10px 14px", maxWidth: "75%" }}>
+                  <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.white, lineHeight: 1.55 }}>
+                    Yeah, I ended up skipping Methotrexate.
+                  </p>
+                </div>
+              </div>
+              {/* Companion follow-up */}
+              <div style={{
+                background: C.bgAI, borderRadius: 16, padding: "16px 18px",
+                border: `1px solid #E8D8C0`, marginBottom: 4,
+              }}>
+                <p style={{ fontFamily: F.serif, fontSize: "0.875rem", lineHeight: 1.7, color: C.textBody, fontStyle: "italic" }}>
+                  "I noted that. How are you feeling about it now?"
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Mood selector (if no mood set) */}
           {!mood && (
-            <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.borderLight}`, background: C.bgAI }}>
-              <p style={{ fontFamily: F.serif, fontSize: 14, color: C.muted, fontStyle: "italic", marginBottom: 14 }}>How are you feeling right now?</p>
+            <div style={{ padding: "20px 24px", borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.borderLight}`, background: C.bgAI, marginTop: 16 }}>
+              <p style={{ fontFamily: F.serif, fontSize: "1.125rem", color: C.text, fontStyle: "italic", marginBottom: 14 }}>How are you feeling right now?</p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {[
                   { label: "Calm", value: 1 },
@@ -829,13 +1254,14 @@ export default function App() {
                       const pool = m.value <= 2 ? AI_RESPONSES.calm : m.value <= 3 ? AI_RESPONSES.uneasy : AI_RESPONSES.anxious;
                       setCompanionMessages([{ text: pickRandom(pool), isAI: true }]);
                     }}
+                    className={`mood-chip${mood?.value === m.value ? " selected" : ""}`}
                     style={{
-                      padding: "7px 14px", borderRadius: 20,
+                      padding: "8px 16px", borderRadius: 9999,
                       background: C.bgCard, border: `1px solid ${C.border}`,
-                      fontFamily: F.sans, fontSize: 12, color: C.text, cursor: "pointer",
+                      fontFamily: F.sans, fontSize: "0.875rem", color: C.textBody,
                     }}
                   >
-                    {m.label}
+                    <span>{m.label}</span>
                   </button>
                 ))}
               </div>
@@ -847,22 +1273,20 @@ export default function App() {
             {companionMessages.map((msg, i) => (
               <div
                 key={i}
-                style={{
-                  marginBottom: 20,
-                  animation: "fadeUp 0.4s ease both",
-                }}
+                style={{ marginBottom: 20, animation: "fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) both" }}
               >
                 {msg.isAI ? (
                   <div style={{
                     background: C.bgAI,
-                    borderRadius: 16, padding: "24px 24px",
+                    borderRadius: 16, padding: "24px",
                     border: `1px solid #E8D8C0`,
-                    boxShadow: "0 2px 12px rgba(196,131,90,0.08)",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
                   }}>
                     <p style={{
                       fontFamily: F.serif,
-                      fontSize: 16, lineHeight: 1.85,
-                      color: C.text,
+                      fontStyle: "italic",
+                      fontSize: "1.125rem", lineHeight: 1.7,
+                      color: C.textBody,
                       whiteSpace: "pre-line",
                     }}>
                       {msg.text}
@@ -875,7 +1299,7 @@ export default function App() {
                       background: C.sage, borderRadius: "14px 4px 14px 14px",
                       padding: "12px 16px",
                     }}>
-                      <p style={{ fontFamily: F.sans, fontSize: 14, color: C.white, lineHeight: 1.55 }}>{msg.text}</p>
+                      <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.white, lineHeight: 1.55 }}>{msg.text}</p>
                     </div>
                   </div>
                 )}
@@ -883,7 +1307,7 @@ export default function App() {
             ))}
             {companionTyping && (
               <div style={{ background: C.bgAI, borderRadius: 16, padding: "20px 24px", marginBottom: 20, border: `1px solid #E8D8C0` }}>
-                <p style={{ fontFamily: F.serif, fontSize: 15, color: C.muted, fontStyle: "italic" }}>Writing…</p>
+                <p style={{ fontFamily: F.serif, fontSize: "1rem", color: C.muted, fontStyle: "italic" }}>Writing…</p>
               </div>
             )}
             <div ref={companionEndRef} />
@@ -894,17 +1318,17 @@ export default function App() {
             position: "fixed", bottom: 65, left: "50%", transform: "translateX(-50%)",
             width: "100%", maxWidth: 390,
             background: C.white, borderTop: `1px solid ${C.border}`,
-            borderBottom: `1px solid ${C.border}`,
             padding: "14px 20px 14px",
             zIndex: 10,
           }}>
             {activeMed && !medTaken && (
               <button
+                className="btn-primary"
                 onClick={() => setScreen(S.LOG_CONFIRM)}
                 style={{
-                  width: "100%", padding: "13px", borderRadius: 12, marginBottom: 12,
+                  width: "100%", minHeight: 48, padding: "0 20px", borderRadius: 9999, marginBottom: 12,
                   background: C.sage, border: "none",
-                  fontFamily: F.sans, fontSize: 14, fontWeight: 600,
+                  fontFamily: F.sans, fontSize: "0.9375rem", fontWeight: 600,
                   color: C.white, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}
@@ -919,20 +1343,21 @@ export default function App() {
                 onKeyDown={e => e.key === "Enter" && sendCompanionMessage()}
                 placeholder="Reply to your companion…"
                 style={{
-                  flex: 1, padding: "10px 14px", borderRadius: 10,
+                  flex: 1, padding: "12px 18px", borderRadius: 9999,
                   border: `1px solid ${C.border}`, background: C.bg,
-                  fontFamily: F.sans, fontSize: 13, color: C.text, outline: "none",
+                  fontFamily: F.sans, fontSize: "1rem", color: C.text, outline: "none",
                 }}
               />
               <button
+                className="btn-primary"
                 onClick={sendCompanionMessage}
                 style={{
                   background: C.sage, border: "none",
-                  borderRadius: 10, width: 42, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: 9999, width: 44, height: 44, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                 }}
               >
-                <ArrowRight size={16} color={C.white} />
+                <Send size={16} color={C.white} />
               </button>
             </div>
           </div>
@@ -948,14 +1373,14 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, paddingBottom: 80 }}>
+        <div className="phone-frame" style={{ ...phoneWrap, paddingBottom: 80 }}>
 
           <div style={{ padding: "52px 24px 24px" }}>
-            <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Symptom Journal</p>
-            <h2 style={{ fontFamily: F.serif, fontSize: 26, color: C.text, fontWeight: 400, lineHeight: 1.35, marginBottom: 8 }}>
+            <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Start your journal</p>
+            <h2 style={{ fontFamily: F.serif, fontSize: "1.5rem", color: C.text, fontWeight: 400, lineHeight: 1.35, marginBottom: 8 }}>
               <em>{journalPrompt}</em>
             </h2>
-            <p style={{ fontFamily: F.sans, fontSize: 13, color: C.light, marginBottom: 28 }}>
+            <p style={{ fontFamily: F.sans, fontSize: "1rem", color: C.textBody, marginBottom: 24, lineHeight: 1.6 }}>
               No form to fill. Just say what's true today.
             </p>
 
@@ -966,28 +1391,31 @@ export default function App() {
                 placeholder="Write here…"
                 rows={7}
                 style={{
-                  width: "100%", padding: "18px",
+                  width: "100%", padding: "18px 20px",
                   borderRadius: 16,
-                  border: `1.5px solid ${journalText ? "#E8D8C0" : C.border}`,
+                  border: `1.5px solid ${journalText ? "rgba(193,123,74,0.4)" : C.border}`,
                   background: journalText ? C.bgAI : C.bgCard,
-                  fontFamily: F.serif, fontSize: 16, color: C.text,
+                  fontFamily: F.sans, fontSize: "1rem", color: C.text,
                   lineHeight: 1.8, outline: "none",
                   transition: "all 0.25s ease",
-                  boxShadow: journalText ? "0 2px 12px rgba(196,131,90,0.08)" : "none",
+                  boxShadow: journalText ? "0 2px 12px rgba(193,123,74,0.08)" : "none",
+                  minHeight: 140,
                 }}
               />
             </div>
 
             <button
+              className="btn-primary"
               onClick={() => { if (journalText.trim()) setJournalSaved(true); }}
               disabled={!journalText.trim() || journalSaved}
               style={{
-                width: "100%", padding: "15px", borderRadius: 14,
-                background: journalSaved ? C.sageLight : journalText.trim() ? C.terra : C.border,
-                border: "none", fontFamily: F.sans, fontSize: 14, fontWeight: 600,
-                color: journalSaved ? C.sageDark : journalText.trim() ? C.white : C.light,
-                cursor: journalText.trim() && !journalSaved ? "pointer" : "default",
-                transition: "all 0.3s ease",
+                width: "100%", minHeight: 52, padding: "0 24px", borderRadius: 9999,
+                background: journalSaved ? C.sageLight : journalText.trim() ? C.sage : C.border,
+                border: "none", fontFamily: F.sans, fontSize: "1rem", fontWeight: 600,
+                color: journalSaved ? C.sageDark : journalText.trim() ? C.white : C.muted,
+                cursor: journalText.trim() && !journalSaved ? "pointer" : "not-allowed",
+                opacity: journalText.trim() || journalSaved ? 1 : 0.6,
+                transition: "background 300ms ease, color 200ms ease, opacity 200ms ease",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
               }}
             >
@@ -998,24 +1426,27 @@ export default function App() {
 
             {/* Past entries */}
             <div style={{ marginTop: 36 }}>
-              <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>Recent</p>
-              {[
-                { date: "Mar 4", text: "Fatigue was high this morning but it lifted around noon. Grateful for that." },
-                { date: "Mar 2", text: "Joints felt stiff on waking but the walk helped. Took all three today." },
-                { date: "Feb 28", text: "Hard day. Didn't want to take anything. Wrote this instead. Tomorrow." },
-              ].map((entry, i) => (
-                <div
-                  key={i}
-                  style={{
-                    background: C.bgCard, border: `1px solid ${C.border}`,
-                    borderRadius: 14, padding: "16px", marginBottom: 10,
-                    animation: `fadeUp 0.4s ease ${i * 0.08}s both`,
-                  }}
-                >
-                  <p style={{ fontFamily: F.sans, fontSize: 11, color: C.light, marginBottom: 6 }}>{entry.date}</p>
-                  <p style={{ fontFamily: F.serif, fontSize: 14, color: C.muted, lineHeight: 1.65, fontStyle: "italic" }}>&ldquo;{entry.text}&rdquo;</p>
-                </div>
-              ))}
+              <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>Recent</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[
+                  { date: "Mar 4", text: "Fatigue was high this morning but it lifted around noon. Grateful for that." },
+                  { date: "Mar 2", text: "Joints felt stiff on waking but the walk helped. Took all three today." },
+                  { date: "Feb 28", text: "Hard day. Didn't want to take anything. Wrote this instead. Tomorrow." },
+                ].map((entry, i) => (
+                  <div
+                    key={i}
+                    className="journal-entry card-list-item"
+                    style={{
+                      background: C.bgCard, border: `1px solid ${C.border}`,
+                      borderRadius: 16, padding: "16px 18px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                    }}
+                  >
+                    <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, marginBottom: 6, fontWeight: 500 }}>{entry.date}</p>
+                    <p style={{ fontFamily: F.serif, fontSize: "1rem", color: C.textBody, lineHeight: 1.65, fontStyle: "italic" }}>&ldquo;{entry.text}&rdquo;</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -1041,83 +1472,129 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, paddingBottom: 80 }}>
+        <div className="phone-frame" style={{ ...phoneWrap, paddingBottom: 80 }}>
 
           <div style={{ padding: "52px 24px 24px" }}>
-            <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Weekly Insights</p>
-            <h2 style={{ fontFamily: F.serif, fontSize: 26, color: C.text, fontWeight: 400, lineHeight: 1.3, marginBottom: 4 }}>
+            <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Weekly Insights</p>
+            <h2 style={{ fontFamily: F.serif, fontSize: "1.875rem", color: C.text, fontWeight: 400, fontStyle: "italic", lineHeight: 1.2, marginBottom: 4 }}>
               A good week, <em>{userName || "Alex"}.</em>
             </h2>
-            <p style={{ fontFamily: F.sans, fontSize: 13, color: C.muted, marginBottom: 28 }}>Here's what your care looked like.</p>
+            <p style={{ fontFamily: F.sans, fontSize: "1rem", color: C.textBody, marginBottom: 24 }}>Here's what your care looked like.</p>
 
             {/* Stats row */}
-            <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
+            <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[
-                { label: "Streak",     value: `${streak}d`,  color: C.streak },
-                { label: "This week",  value: `${weekAvg}%`, color: C.sage },
-                { label: "This month", value: "84%",         color: C.terra },
+                { label: "Streak",     value: `${streak}d`,  color: C.sage },
+                { label: "This week",  value: `${weekAvg}%`, color: adherenceColor(weekAvg) },
+                { label: "This month", value: "84%",         color: adherenceColor(84) },
               ].map((s, i) => (
                 <div
                   key={i}
+                  className="card-list-item"
                   style={{
                     flex: 1, background: C.bgCard,
-                    borderRadius: 14, padding: "16px 10px",
+                    borderRadius: 16, padding: "16px 10px",
                     border: `1px solid ${C.border}`, textAlign: "center",
-                    animation: `fadeUp 0.4s ease ${i * 0.1}s both`,
-                    boxShadow: "0 1px 4px rgba(26,26,24,0.05)",
+                    boxShadow: "0 1px 3px rgba(26,26,24,0.05)",
                   }}
                 >
-                  <p style={{ fontFamily: F.serif, fontSize: 22, color: s.color, fontWeight: 600 }}>{s.value}</p>
-                  <p style={{ fontFamily: F.sans, fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>{s.label}</p>
+                  <p style={{ fontFamily: F.sans, fontSize: "1.5rem", color: s.color, fontWeight: 700 }}>{s.value}</p>
+                  <p style={{ fontFamily: F.sans, fontSize: "0.625rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>{s.label}</p>
                 </div>
               ))}
             </div>
 
             {/* Week bar chart */}
-            <div style={{ background: C.bgCard, borderRadius: 16, padding: "20px", border: `1px solid ${C.border}`, marginBottom: 16, animation: "fadeUp 0.5s ease 0.3s both", boxShadow: "0 1px 4px rgba(26,26,24,0.05)" }}>
-              <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>Daily adherence</p>
-              <div style={{ display: "flex", gap: 6, alignItems: "flex-end", height: 80 }}>
-                {weekData.map((d, i) => (
-                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+            <div style={{ background: C.bgCard, borderRadius: 16, padding: "20px", border: `1px solid ${C.border}`, marginBottom: 16, animation: "fadeUp 0.5s ease 0.3s both", boxShadow: "0 1px 3px rgba(26,26,24,0.05)" }}>
+              <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>Daily adherence</p>
+
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                {/* Y-axis labels */}
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: 80, paddingBottom: 20, gap: 0 }}>
+                  <span style={{ fontFamily: F.sans, fontSize: "0.625rem", color: C.muted, lineHeight: 1 }}>100%</span>
+                  <span style={{ fontFamily: F.sans, fontSize: "0.625rem", color: C.muted, lineHeight: 1 }}>50%</span>
+                  <span style={{ fontFamily: F.sans, fontSize: "0.625rem", color: C.muted, lineHeight: 1 }}>0%</span>
+                </div>
+
+                {/* Chart bars */}
+                <div style={{ flex: 1 }}>
+                  {/* 50% reference line */}
+                  <div style={{ position: "relative" }}>
+                    <div style={{ display: "flex", gap: 6, alignItems: "flex-end", height: 80 }}>
+                      {weekData.map((d, i) => {
+                        const barColor = d.pct === 100 ? C.sage : d.pct > 0 ? C.terra : C.border;
+                        return (
+                          <div
+                            key={i}
+                            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+                            title={`${d.day}: ${d.pct}% adherence`}
+                          >
+                            <div style={{
+                              width: "100%",
+                              height: Math.max(d.pct * 0.56, 3),
+                              borderRadius: "4px 4px 0 0",
+                              background: barColor,
+                              transition: "height 0.8s ease",
+                              minHeight: 3,
+                            }} />
+                            <span style={{ fontFamily: F.sans, fontSize: "0.625rem", color: C.muted }}>{d.day}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* 50% dashed line */}
                     <div style={{
-                      width: "100%", height: d.pct * 0.7,
-                      borderRadius: "4px 4px 0 0",
-                      background: d.pct === 100 ? C.streak : d.pct >= 67 ? C.sage : d.pct > 0 ? C.terra : C.borderLight,
-                      transition: "height 0.8s ease",
-                      minHeight: 4,
+                      position: "absolute",
+                      left: 0, right: 0,
+                      bottom: 20 + (80 * 0.5 * 0.7),
+                      height: 1,
+                      background: C.borderLight,
+                      pointerEvents: "none",
                     }} />
-                    <span style={{ fontFamily: F.sans, fontSize: 10, color: C.light }}>{d.day}</span>
                   </div>
-                ))}
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div style={{ display: "flex", gap: 16, marginTop: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.sage }} />
+                  <span style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted }}>Taken</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.terra }} />
+                  <span style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted }}>Missed</span>
+                </div>
               </div>
             </div>
 
-            {/* Motivating message */}
-            <div style={{ background: C.bgAI, borderRadius: 16, padding: "20px 22px", border: `1px solid #E8D8C0`, marginBottom: 16, animation: "fadeUp 0.5s ease 0.4s both" }}>
-              <p style={{ fontFamily: F.serif, fontSize: 15, color: C.text, lineHeight: 1.75, fontStyle: "italic" }}>
+            {/* Companion quote card */}
+            <div style={{ background: C.bgAI, borderRadius: 16, padding: "20px 22px", border: `1px solid rgba(193,123,74,0.2)`, marginBottom: 16, animation: "fadeUp 0.5s ease 0.4s both", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+              <p style={{ fontFamily: F.serif, fontSize: "1rem", color: C.textBody, lineHeight: 1.75, fontStyle: "italic" }}>
                 "You've taken your medication on {weekAvg}% of days this week. That consistency is doing quiet, important work in your body — even on the days it doesn't feel like it."
               </p>
             </div>
 
             {/* Clinician link */}
             <button
+              className="clinician-card"
               onClick={() => setScreen(S.CLINICIAN)}
               style={{
-                width: "100%", padding: "14px 18px", borderRadius: 14,
+                width: "100%", padding: "14px 18px", borderRadius: 16,
                 background: C.bgCard, border: `1px solid ${C.border}`,
                 display: "flex", alignItems: "center", gap: 12,
                 cursor: "pointer", animation: "fadeUp 0.5s ease 0.5s both",
-                boxShadow: "0 1px 4px rgba(26,26,24,0.05)",
+                boxShadow: "0 1px 3px rgba(26,26,24,0.05)",
               }}
             >
               <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.sageLight, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Stethoscope size={18} color={C.sage} strokeWidth={1.5} />
               </div>
               <div style={{ textAlign: "left" }}>
-                <p style={{ fontFamily: F.sans, fontWeight: 500, fontSize: 13, color: C.text }}>Clinician summary</p>
-                <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted }}>What your doctor sees at your next visit</p>
+                <p style={{ fontFamily: F.sans, fontWeight: 600, fontSize: "1rem", color: C.text }}>Clinician summary</p>
+                <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted }}>What your doctor sees at your next visit</p>
               </div>
-              <ArrowRight size={16} color={C.light} style={{ marginLeft: "auto" }} />
+              <ArrowRight size={16} color={C.muted} className="arrow-icon" style={{ marginLeft: "auto" }} />
             </button>
           </div>
 
@@ -1132,62 +1609,79 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap, paddingBottom: 40 }}>
+        <div className="phone-frame" style={{ ...phoneWrap, paddingBottom: 40 }}>
 
           <div style={{ padding: "56px 24px 20px", background: C.bg, borderBottom: `1px solid ${C.border}` }}>
-            <button onClick={() => setScreen(S.INSIGHTS)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontFamily: F.sans, fontSize: 13, padding: 0, display: "flex", alignItems: "center", gap: 6, marginBottom: 20 }}>
+            <button
+              className="back-link"
+              onClick={() => setScreen(S.INSIGHTS)}
+              style={{
+                background: "none", border: "none", color: C.sage, cursor: "pointer",
+                fontFamily: F.sans, fontSize: "0.875rem", fontWeight: 500,
+                padding: "10px 0", display: "flex", alignItems: "center", gap: 6,
+                marginBottom: 20, minHeight: 44,
+              }}
+            >
               <ChevronLeft size={16} /> Insights
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", background: C.sageLight, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Stethoscope size={18} color={C.sage} strokeWidth={1.5} />
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: C.sageLight, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Stethoscope size={20} color={C.sage} strokeWidth={1.5} />
               </div>
               <div>
-                <p style={{ fontFamily: F.sans, fontWeight: 500, fontSize: 15, color: C.text }}>Clinician View</p>
-                <p style={{ fontFamily: F.sans, fontSize: 12, color: C.muted }}>What your doctor sees</p>
+                <p style={{ fontFamily: F.serif, fontSize: "1.125rem", fontWeight: 500, color: C.text }}>Clinician View</p>
+                <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted }}>What your doctor sees</p>
               </div>
             </div>
           </div>
 
           <div style={{ padding: "24px" }}>
             {/* Patient info */}
-            <div style={{ background: C.bgCard, borderRadius: 16, padding: "18px", border: `1px solid ${C.border}`, marginBottom: 14, boxShadow: "0 1px 4px rgba(26,26,24,0.05)" }}>
+            <div style={{ background: C.bgCard, borderRadius: 20, padding: "20px", border: `1px solid ${C.border}`, marginBottom: 14, boxShadow: "0 1px 3px rgba(26,26,24,0.05)", animation: "fadeUp 0.4s ease both" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
                 <div>
-                  <p style={{ fontFamily: F.sans, fontWeight: 600, fontSize: 15, color: C.text }}>{userName || "Alex"} — Patient</p>
-                  <p style={{ fontFamily: F.sans, fontSize: 12, color: C.muted, marginTop: 2 }}>{condition || "Rheumatoid Arthritis"}</p>
+                  <p style={{ fontFamily: F.serif, fontSize: "1.25rem", fontWeight: 600, color: C.text }}>{userName || "Alex"} — Patient</p>
+                  <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted, marginTop: 2 }}>{condition || "Rheumatoid Arthritis"}</p>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <p style={{ fontFamily: F.sans, fontSize: 11, color: C.light }}>Report generated</p>
-                  <p style={{ fontFamily: F.sans, fontSize: 12, color: C.muted }}>5 Mar 2026</p>
+                  <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted }}>Report generated</p>
+                  <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted }}>5 Mar 2026</p>
                 </div>
               </div>
               <div style={{ height: 1, background: C.border, marginBottom: 14 }} />
               <div style={{ display: "flex", gap: 12 }}>
                 {[
-                  { label: "Streak",     value: `${streak} days`, color: C.streak },
-                  { label: "30-day avg", value: "87%",            color: C.sage },
+                  { label: "Streak",     value: `${streak} days`, color: C.sage },
+                  { label: "30-day avg", value: "87%",            color: adherenceColor(87) },
                   { label: "Missed",     value: "4 doses",        color: C.terra },
                 ].map((s, i) => (
                   <div key={i} style={{ flex: 1, textAlign: "center" }}>
-                    <p style={{ fontFamily: F.serif, fontSize: 18, color: s.color, fontWeight: 600 }}>{s.value}</p>
-                    <p style={{ fontFamily: F.sans, fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>{s.label}</p>
+                    <p style={{ fontFamily: F.sans, fontSize: "1.125rem", color: s.color, fontWeight: 700 }}>{s.value}</p>
+                    <p style={{ fontFamily: F.sans, fontSize: "0.625rem", color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>{s.label}</p>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Medication log */}
-            <div style={{ background: C.bgCard, borderRadius: 16, padding: "18px", border: `1px solid ${C.border}`, marginBottom: 14, boxShadow: "0 1px 4px rgba(26,26,24,0.05)" }}>
-              <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>Current regimen</p>
+            <div style={{ background: C.bgCard, borderRadius: 16, padding: "18px", border: `1px solid ${C.border}`, marginBottom: 14, boxShadow: "0 1px 3px rgba(26,26,24,0.05)", animation: "fadeUp 0.4s ease 0.1s both" }}>
+              <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>Current regimen</p>
               {INITIAL_MEDS.map((med, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: i < INITIAL_MEDS.length - 1 ? 12 : 0, marginBottom: i < INITIAL_MEDS.length - 1 ? 12 : 0, borderBottom: i < INITIAL_MEDS.length - 1 ? `1px solid ${C.borderLight}` : "none" }}>
                   <div>
-                    <p style={{ fontFamily: F.sans, fontWeight: 500, fontSize: 13, color: C.text }}>{med.name}</p>
-                    <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted }}>{med.dose} · {med.time}</p>
+                    <p style={{ fontFamily: F.sans, fontWeight: 600, fontSize: "0.9375rem", color: C.text }}>{med.name}</p>
+                    <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted }}>{med.dose} · {med.time}</p>
                   </div>
-                  <div style={{ background: i === 1 || meds[i].taken ? C.sageLight : C.terraLight, borderRadius: 20, padding: "4px 12px" }}>
-                    <p style={{ fontFamily: F.sans, fontSize: 11, color: i === 1 || meds[i].taken ? C.sageDark : C.terraDark, fontWeight: 500 }}>
+                  {/* Status pill */}
+                  <div style={{
+                    background: (i === 1 || meds[i].taken) ? C.sageLight : C.terraLight,
+                    borderRadius: 9999, padding: "3px 12px",
+                  }}>
+                    <p style={{
+                      fontFamily: F.sans, fontSize: "0.75rem",
+                      color: (i === 1 || meds[i].taken) ? C.sage : C.terra,
+                      fontWeight: 600,
+                    }}>
                       {i === 1 || meds[i].taken ? "Taken today" : "Pending"}
                     </p>
                   </div>
@@ -1196,29 +1690,42 @@ export default function App() {
             </div>
 
             {/* Mood pattern */}
-            <div style={{ background: C.bgCard, borderRadius: 16, padding: "18px", border: `1px solid ${C.border}`, marginBottom: 14, boxShadow: "0 1px 4px rgba(26,26,24,0.05)" }}>
-              <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>Emotional patterns (30 days)</p>
+            <div style={{ background: C.bgCard, borderRadius: 16, padding: "18px", border: `1px solid ${C.border}`, marginBottom: 14, boxShadow: "0 1px 3px rgba(26,26,24,0.05)", animation: "fadeUp 0.4s ease 0.2s both" }}>
+              <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>Emotional patterns (30 days)</p>
+              {/* Legend */}
+              <div style={{ display: "flex", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
+                {[
+                  { label: "Calm / Okay", color: C.sage },
+                  { label: "Uneasy",      color: "#C4973A" },
+                  { label: "Anxious",     color: C.terra },
+                ].map((e, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: e.color }} />
+                    <span style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted }}>{e.label}</span>
+                  </div>
+                ))}
+              </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {[
                   { label: "Calm / Okay", pct: 58, color: C.sage },
-                  { label: "Uneasy",      pct: 28, color: C.terra },
-                  { label: "Anxious",     pct: 14, color: "#B85A3A" },
+                  { label: "Uneasy",      pct: 28, color: "#C4973A" },
+                  { label: "Anxious",     pct: 14, color: C.terra },
                 ].map((e, i) => (
                   <div key={i} style={{ flex: 1 }}>
-                    <div style={{ height: 6, borderRadius: 99, background: C.borderLight, overflow: "hidden", marginBottom: 6 }}>
-                      <div style={{ height: "100%", width: `${e.pct}%`, background: e.color, borderRadius: 99 }} />
+                    <div style={{ height: 6, borderRadius: 4, background: C.borderLight, overflow: "hidden", marginBottom: 6 }}>
+                      <div style={{ height: "100%", width: `${e.pct}%`, background: e.color, borderRadius: 4 }} />
                     </div>
-                    <p style={{ fontFamily: F.sans, fontSize: 10, color: C.muted }}>{e.label}</p>
-                    <p style={{ fontFamily: F.sans, fontSize: 12, color: C.text, fontWeight: 600 }}>{e.pct}%</p>
+                    <p style={{ fontFamily: F.sans, fontSize: "0.625rem", color: C.muted }}>{e.label}</p>
+                    <p style={{ fontFamily: F.sans, fontSize: "0.9375rem", color: C.text, fontWeight: 600 }}>{e.pct}%</p>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Note */}
-            <div style={{ background: C.bgAI, borderRadius: 16, padding: "18px", border: `1px solid #E8D8C0` }}>
-              <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>App-generated note</p>
-              <p style={{ fontFamily: F.serif, fontSize: 14, color: C.text, lineHeight: 1.75, fontStyle: "italic" }}>
+            <div style={{ background: C.bgAI, borderRadius: 16, padding: "20px", border: `1px solid ${C.border}`, animation: "fadeUp 0.4s ease 0.3s both" }}>
+              <p style={{ fontFamily: F.sans, fontSize: "0.75rem", color: C.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>App-generated note</p>
+              <p style={{ fontFamily: F.serif, fontSize: "1rem", color: C.textBody, lineHeight: 1.75, fontStyle: "italic" }}>
                 "Patient has maintained a {streak}-day adherence streak. Anxiety-related non-adherence patterns were flagged on 3 occasions — all resolved via companion check-in. Overall trend is positive."
               </p>
             </div>
@@ -1234,31 +1741,31 @@ export default function App() {
     return (
       <div style={outerWrap}>
         <GlobalStyles />
-        <div style={{ ...phoneWrap }}>
+        <div className="phone-frame" style={{ ...phoneWrap }}>
           <div style={{ padding: "56px 24px 24px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
               <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.terraLight, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Heart size={16} color={C.terra} strokeWidth={1.5} />
               </div>
               <div>
-                <p style={{ fontFamily: F.sans, fontWeight: 500, fontSize: 13, color: C.terra }}>Coming back</p>
-                <p style={{ fontFamily: F.sans, fontSize: 11, color: C.muted }}>{activeMed?.name} · {activeMed?.dose}</p>
+                <p style={{ fontFamily: F.sans, fontWeight: 500, fontSize: "0.9375rem", color: C.terra }}>Coming back</p>
+                <p style={{ fontFamily: F.sans, fontSize: "0.875rem", color: C.muted }}>{activeMed?.name} · {activeMed?.dose}</p>
               </div>
             </div>
 
             {/* Progress */}
             <div style={{ display: "flex", gap: 6, marginBottom: 36 }}>
               {RECOVERY_STEPS.map((_, i) => (
-                <div key={i} style={{ flex: 1, height: 3, borderRadius: 99, background: i <= recoveryStep ? C.terra : C.border, transition: "background 0.4s ease" }} />
+                <div key={i} style={{ flex: 1, height: 3, borderRadius: 9999, background: i <= recoveryStep ? C.terra : C.border, transition: "background 0.4s ease" }} />
               ))}
             </div>
 
-            <h2 style={{ fontFamily: F.serif, fontSize: 26, color: C.text, fontWeight: 400, marginBottom: 16, lineHeight: 1.3, animation: "fadeUp 0.5s ease both" }}>
+            <h2 style={{ fontFamily: F.serif, fontSize: "1.625rem", color: C.text, fontWeight: 400, marginBottom: 16, lineHeight: 1.3, animation: "fadeUp 0.5s ease both" }}>
               {step.title}
             </h2>
 
             {step.body && (
-              <p style={{ fontFamily: F.sans, fontSize: 15, color: C.muted, lineHeight: 1.75, marginBottom: 32, whiteSpace: "pre-line", animation: "fadeUp 0.5s ease 0.1s both" }}>
+              <p style={{ fontFamily: F.sans, fontSize: "1rem", color: C.textBody, lineHeight: 1.75, marginBottom: 32, whiteSpace: "pre-line", animation: "fadeUp 0.5s ease 0.1s both" }}>
                 {step.body}
               </p>
             )}
@@ -1269,11 +1776,12 @@ export default function App() {
                   <button
                     key={i}
                     onClick={() => setRecoveryStep(s => s + 1)}
+                    className="card-interactive"
                     style={{
                       background: C.bgCard, border: `1px solid ${C.border}`,
-                      borderRadius: 14, padding: "14px 18px",
-                      fontFamily: F.sans, fontSize: 14, color: C.text,
-                      cursor: "pointer", textAlign: "left", transition: "all 0.2s ease",
+                      borderRadius: 16, padding: "14px 18px",
+                      fontFamily: F.sans, fontSize: "1rem", color: C.text,
+                      cursor: "pointer", textAlign: "left",
                     }}
                   >
                     {opt}
@@ -1282,11 +1790,12 @@ export default function App() {
               </div>
             ) : (
               <button
+                className="btn-primary"
                 onClick={() => step.final ? completeRecovery() : setRecoveryStep(s => s + 1)}
                 style={{
-                  width: "100%", padding: "16px", borderRadius: 14,
+                  width: "100%", minHeight: 52, padding: "0 24px", borderRadius: 9999,
                   background: step.final ? C.sage : C.terra,
-                  border: "none", fontFamily: F.sans, fontSize: 15, fontWeight: 600,
+                  border: "none", fontFamily: F.sans, fontSize: "1rem", fontWeight: 600,
                   color: C.white, cursor: "pointer", animation: "fadeUp 0.5s ease 0.2s both",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}

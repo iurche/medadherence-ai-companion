@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   Home, MessageCircle, BookOpen, BarChart2, ChevronLeft,
   Check, Leaf, Sun, Moon, Clock, User, Stethoscope, Activity,
@@ -35,61 +34,58 @@ Voice rules:
 - Never tell them to stop or change their dose — that's their doctor's call
 - Self-harm or genuine emergency: respond with warmth, direct them to call their doctor or emergency services`;
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-const geminiModel = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash",
-  systemInstruction: COMPANION_SYSTEM,
-});
+// genAI and geminiModel will now be handled by the backend proxy
+const GEMINI_PROXY_URL = "/api/gemini";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────
 const C = {
-  bg:           "#FAF8F4",   // warm cream page background
-  bgCard:       "#FFFFFF",   // card/panel surfaces
-  bgAI:         "#FDF6EE",   // warm tinted surface
-  sage:         "#5A8B6E",   // sage green — primary
-  sageLight:    "#EEF4F0",   // sage 10% tint
-  sageDark:     "#4A7A5A",   // darker sage
-  terra:        "#C17B4A",   // terracotta accent
-  terraLight:   "#FDF0E8",   // terracotta 10% tint
-  terraDark:    "#A05A38",   // darker terra
-  text:         "#2C2A27",   // near-black warm
-  textBody:     "#4A4742",   // dark warm grey body
-  muted:        "#7A7470",   // muted warm grey
-  light:        "#9CA3AF",   // compat alias
-  streak:       "#5A8B6E",   // sage for streaks
-  border:       "#E8E3DC",   // warm border
-  borderLight:  "#F0EAE2",   // lighter border
-  white:        "#FFFFFF",
-  dark:         "#1A2B22",
-  darkSurface:  "#233828",
+  bg: "#FAF8F4",   // warm cream page background
+  bgCard: "#FFFFFF",   // card/panel surfaces
+  bgAI: "#FDF6EE",   // warm tinted surface
+  sage: "#5A8B6E",   // sage green — primary
+  sageLight: "#EEF4F0",   // sage 10% tint
+  sageDark: "#4A7A5A",   // darker sage
+  terra: "#C17B4A",   // terracotta accent
+  terraLight: "#FDF0E8",   // terracotta 10% tint
+  terraDark: "#A05A38",   // darker terra
+  text: "#2C2A27",   // near-black warm
+  textBody: "#4A4742",   // dark warm grey body
+  muted: "#7A7470",   // muted warm grey
+  light: "#9CA3AF",   // compat alias
+  streak: "#5A8B6E",   // sage for streaks
+  border: "#E8E3DC",   // warm border
+  borderLight: "#F0EAE2",   // lighter border
+  white: "#FFFFFF",
+  dark: "#1A2B22",
+  darkSurface: "#233828",
 };
 
 const F = {
   serif: "'Lora', Georgia, serif",
-  sans:  "'Raleway', system-ui, sans-serif",
+  sans: "'Raleway', system-ui, sans-serif",
 };
 
 // ─── SCREENS ──────────────────────────────────────────────────────
 const S = {
-  ONBOARD_WELCOME:   "onboard_welcome",
-  ONBOARD_NAME:      "onboard_name",
+  ONBOARD_WELCOME: "onboard_welcome",
+  ONBOARD_NAME: "onboard_name",
   ONBOARD_CONDITION: "onboard_condition",
-  ONBOARD_MEDS:      "onboard_meds",
-  HOME:              "home",
-  LOG_CONFIRM:       "log_confirm",
-  LOG_CELEBRATE:     "log_celebrate",
-  COMPANION:         "companion",
-  JOURNAL:           "journal",
-  INSIGHTS:          "insights",
-  CLINICIAN:         "clinician",
-  RECOVERY:          "recovery",
+  ONBOARD_MEDS: "onboard_meds",
+  HOME: "home",
+  LOG_CONFIRM: "log_confirm",
+  LOG_CELEBRATE: "log_celebrate",
+  COMPANION: "companion",
+  JOURNAL: "journal",
+  INSIGHTS: "insights",
+  CLINICIAN: "clinician",
+  RECOVERY: "recovery",
 };
 
 // ─── DATA ─────────────────────────────────────────────────────────
 const INITIAL_MEDS = [
-  { id: 1, name: "Methotrexate",      dose: "15mg",  time: "8:00 AM",  taken: false, skipped: false },
-  { id: 2, name: "Folic Acid",        dose: "5mg",   time: "8:00 AM",  taken: true,  skipped: false },
-  { id: 3, name: "Hydroxychloroquine",dose: "200mg", time: "2:00 PM",  taken: false, skipped: false },
+  { id: 1, name: "Methotrexate", dose: "15mg", time: "8:00 AM", taken: false, skipped: false },
+  { id: 2, name: "Folic Acid", dose: "5mg", time: "8:00 AM", taken: true, skipped: false },
+  { id: 3, name: "Hydroxychloroquine", dose: "200mg", time: "2:00 PM", taken: false, skipped: false },
 ];
 
 const CONDITIONS = [
@@ -238,10 +234,10 @@ function ProgressDots({ step, total = 3 }) {
 // ─── BOTTOM NAV ───────────────────────────────────────────────────
 function BottomNav({ current, onNavigate }) {
   const tabs = [
-    { id: S.HOME,       icon: Home,          label: "Today" },
-    { id: S.COMPANION,  icon: MessageCircle, label: "Companion" },
-    { id: S.JOURNAL,    icon: BookOpen,      label: "Journal" },
-    { id: S.INSIGHTS,   icon: BarChart2,     label: "Insights" },
+    { id: S.HOME, icon: Home, label: "Today" },
+    { id: S.COMPANION, icon: MessageCircle, label: "Companion" },
+    { id: S.JOURNAL, icon: BookOpen, label: "Journal" },
+    { id: S.INSIGHTS, icon: BarChart2, label: "Insights" },
   ];
   const activeIdx = tabs.findIndex(t => t.id === current);
   return (
@@ -563,31 +559,31 @@ const GlobalStyles = () => (
 
 // ─── MAIN APP ─────────────────────────────────────────────────────
 export default function App() {
-  const [screen, setScreen]           = useState(S.ONBOARD_WELCOME);
-  const [userName, setUserName]       = useState("");
-  const [nameInput, setNameInput]     = useState("");
-  const [condition, setCondition]     = useState(null);
-  const [meds, setMeds]               = useState(INITIAL_MEDS);
-  const [streak, setStreak]           = useState(12);
-  const [activeMed, setActiveMed]     = useState(null);
+  const [screen, setScreen] = useState(S.ONBOARD_WELCOME);
+  const [userName, setUserName] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [condition, setCondition] = useState(null);
+  const [meds, setMeds] = useState(INITIAL_MEDS);
+  const [streak, setStreak] = useState(12);
+  const [activeMed, setActiveMed] = useState(null);
   const [recoveryStep, setRecoveryStep] = useState(0);
 
   // Companion state
   const [companionMessages, setCompanionMessages] = useState([]);
-  const [companionInput, setCompanionInput]       = useState("");
-  const [companionTyping, setCompanionTyping]     = useState(false);
-  const [mood, setMood]               = useState(null);
-  const companionEndRef               = useRef(null);
+  const [companionInput, setCompanionInput] = useState("");
+  const [companionTyping, setCompanionTyping] = useState(false);
+  const [mood, setMood] = useState(null);
+  const companionEndRef = useRef(null);
 
   // Journal state
   const [journalText, setJournalText] = useState("");
   const [journalSaved, setJournalSaved] = useState(false);
-  const [journalPrompt]               = useState(pickRandom(JOURNAL_PROMPTS));
+  const [journalPrompt] = useState(pickRandom(JOURNAL_PROMPTS));
 
-  const takenCount    = meds.filter(m => m.taken).length;
-  const totalMeds     = meds.length;
-  const adherencePct  = Math.round((takenCount / totalMeds) * 100);
-  const pendingMeds   = meds.filter(m => !m.taken && !m.skipped);
+  const takenCount = meds.filter(m => m.taken).length;
+  const totalMeds = meds.length;
+  const adherencePct = Math.round((takenCount / totalMeds) * 100);
+  const pendingMeds = meds.filter(m => !m.taken && !m.skipped);
 
   useEffect(() => {
     companionEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -612,20 +608,23 @@ export default function App() {
     setCompanionMessages(updatedMessages);
     setCompanionTyping(true);
     try {
-      const prior = updatedMessages.slice(0, -1);
-      const firstUserIdx = prior.findIndex(m => !m.isAI);
-      const history = firstUserIdx >= 0
-        ? prior.slice(firstUserIdx).map(m => ({
-            role: m.isAI ? "model" : "user",
-            parts: [{ text: m.text }],
-          }))
-        : [];
-      const chat = geminiModel.startChat({ history });
-      const result = await chat.sendMessage(msg);
-      const reply = result.response.text();
-      setCompanionMessages(prev => [...prev, { text: reply, isAI: true }]);
+      const response = await fetch(GEMINI_PROXY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: updatedMessages,
+          systemInstruction: COMPANION_SYSTEM,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Proxy error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setCompanionMessages(prev => [...prev, { text: data.text, isAI: true }]);
     } catch (err) {
-      console.error("Gemini error:", err);
+      console.error("Gemini Error:", err);
       setCompanionMessages(prev => [...prev, { text: `Error: ${err.message}`, isAI: true }]);
     } finally {
       setCompanionTyping(false);
@@ -1484,9 +1483,9 @@ export default function App() {
             {/* Stats row */}
             <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
               {[
-                { label: "Streak",     value: `${streak}d`,  color: C.sage },
-                { label: "This week",  value: `${weekAvg}%`, color: adherenceColor(weekAvg) },
-                { label: "This month", value: "84%",         color: adherenceColor(84) },
+                { label: "Streak", value: `${streak}d`, color: C.sage },
+                { label: "This week", value: `${weekAvg}%`, color: adherenceColor(weekAvg) },
+                { label: "This month", value: "84%", color: adherenceColor(84) },
               ].map((s, i) => (
                 <div
                   key={i}
@@ -1651,9 +1650,9 @@ export default function App() {
               <div style={{ height: 1, background: C.border, marginBottom: 14 }} />
               <div style={{ display: "flex", gap: 12 }}>
                 {[
-                  { label: "Streak",     value: `${streak} days`, color: C.sage },
-                  { label: "30-day avg", value: "87%",            color: adherenceColor(87) },
-                  { label: "Missed",     value: "4 doses",        color: C.terra },
+                  { label: "Streak", value: `${streak} days`, color: C.sage },
+                  { label: "30-day avg", value: "87%", color: adherenceColor(87) },
+                  { label: "Missed", value: "4 doses", color: C.terra },
                 ].map((s, i) => (
                   <div key={i} style={{ flex: 1, textAlign: "center" }}>
                     <p style={{ fontFamily: F.sans, fontSize: "1.125rem", color: s.color, fontWeight: 700 }}>{s.value}</p>
@@ -1696,8 +1695,8 @@ export default function App() {
               <div style={{ display: "flex", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
                 {[
                   { label: "Calm / Okay", color: C.sage },
-                  { label: "Uneasy",      color: "#C4973A" },
-                  { label: "Anxious",     color: C.terra },
+                  { label: "Uneasy", color: "#C4973A" },
+                  { label: "Anxious", color: C.terra },
                 ].map((e, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={{ width: 8, height: 8, borderRadius: 2, background: e.color }} />
@@ -1708,8 +1707,8 @@ export default function App() {
               <div style={{ display: "flex", gap: 8 }}>
                 {[
                   { label: "Calm / Okay", pct: 58, color: C.sage },
-                  { label: "Uneasy",      pct: 28, color: "#C4973A" },
-                  { label: "Anxious",     pct: 14, color: C.terra },
+                  { label: "Uneasy", pct: 28, color: "#C4973A" },
+                  { label: "Anxious", pct: 14, color: C.terra },
                 ].map((e, i) => (
                   <div key={i} style={{ flex: 1 }}>
                     <div style={{ height: 6, borderRadius: 4, background: C.borderLight, overflow: "hidden", marginBottom: 6 }}>
